@@ -262,10 +262,11 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
         pathParts.pop();
         var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
         
-        var backupExists:Bool = FileSystem.exists(location + ".backup");
+        var backupExists:Bool = FileSystem.exists(location + ".backup") || FileSystem.exists(haxelibLocation + ".backup") || FileSystem.exists(haxeStdLocation + ".backup") || FileSystem.exists(nekoLocation + ".backup");
         if (backupExists == false) {
             log("No backup found!");
         } else {
@@ -284,6 +285,7 @@ class HVM {
             }
 
             if (FileSystem.exists(nekoLocation) && FileSystem.exists(nekoLocation + ".backup")) {
+                log("Deleting existing neko");
                 try {
                     FileSystem.deleteDirectory(nekoLocation);
                 } catch (e) {
@@ -296,7 +298,7 @@ class HVM {
                 }
             }
 
-            if (FileSystem.exists(location)) {
+            if (FileSystem.exists(location) && FileSystem.exists(location + ".backup")) {
                 FileSystem.deleteFile(location);
             }
             
@@ -315,6 +317,7 @@ class HVM {
             }
 
             if (FileSystem.exists(nekoLocation + ".backup")) {
+                log("Restoring neko");
                 try {
                     FileSystem.rename(nekoLocation + ".backup", nekoLocation);
                 } catch (e) {
@@ -331,10 +334,12 @@ class HVM {
                 File.copy(location + ".backup", location);
                 FileSystem.deleteFile(location + ".backup");
             }
+            if (FileSystem.exists(haxelibLocation + ".backup")) {
+                FileSystem.deleteFile(haxelibLocation + ".backup");
+            }
         }
         
-        log("Current haxe version: " + currentHaxeVersion);
-        log("Current neko version: " + currentNekoVersion);
+        log("Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function installOfficial(version:String) {
@@ -344,7 +349,7 @@ class HVM {
 
         downloadOfficial(version);
 
-        var newHaxeLocation:String = downloadNeko(version);
+        var newNekoLocation:String = downloadNeko(version);
 		
 		restoreBackup();
         
@@ -352,6 +357,7 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
         pathParts.pop();
         var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
             
@@ -372,6 +378,23 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(haxelibLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing haxelib");
+            try {
+                if (FileSystem.exists(haxelibLocation)) {
+                    File.copy(haxelibLocation, haxelibLocation + ".backup");
+                }
+            } catch (e) {
+                log("");
+                log("ERROR: could not backup haxelib, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
 		
         backupExists = FileSystem.exists(haxeStdLocation + ".backup");
         if (backupExists == false) {
@@ -400,8 +423,7 @@ class HVM {
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
         
-        log("Current haxe version: " + currentHaxeVersion);
-        log("Current neko version: " + currentNekoVersion);
+        log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function installNightly(version:String) {
@@ -411,7 +433,7 @@ class HVM {
 
         downloadNightly(version);
 
-        var newHaxeLocation:String = downloadNeko(version);
+        var newNekoLocation:String = downloadNeko(version);
 		
 		restoreBackup();
         
@@ -419,6 +441,7 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
         pathParts.pop();
         var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
 
@@ -439,6 +462,23 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(haxelibLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing haxelib");
+            try {
+                if (FileSystem.exists(haxelibLocation)) {
+                    File.copy(haxelibLocation, haxelibLocation + ".backup");
+                }
+            } catch (e) {
+                log("");
+                log("ERROR: could not backup haxelib, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
 		
         backupExists = FileSystem.exists(haxeStdLocation + ".backup");
         if (backupExists == false) {
@@ -467,8 +507,7 @@ class HVM {
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
         
-        log("Current haxe version: " + currentHaxeVersion);
-        log("Current neko version: " + currentNekoVersion);
+        log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function downloadOfficial(version:String) {
