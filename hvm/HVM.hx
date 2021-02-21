@@ -410,6 +410,21 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(nekoLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing neko folder");
+            try {
+                FileSystem.rename(nekoLocation, nekoLocation + ".backup");
+            } catch (e) {
+                log("");
+                log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
         
         log("Deleting existing haxe");
         if (FileSystem.exists(location)) {
@@ -422,6 +437,8 @@ class HVM {
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
+
+        createSymLink(nekoLocation, newNekoLocation);
         
         log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
@@ -494,6 +511,21 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(nekoLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing neko folder");
+            try {
+                FileSystem.rename(nekoLocation, nekoLocation + ".backup");
+            } catch (e) {
+                log("");
+                log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
         
         log("Deleting existing haxe");
         if (FileSystem.exists(location)) {
@@ -506,6 +538,8 @@ class HVM {
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
+
+        createSymLink(nekoLocation, newNekoLocation);
         
         log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
@@ -615,7 +649,7 @@ class HVM {
             var n5 = data.indexOf("-", n4 + 6);
             nekoVersion = data.substring(n4 + 6, n5);
             srcUrl += StringTools.replace(nekoVersion, ".", "-") + "/";
-            is64 = Std.parseFloat(nekoVersion) > 2.1 && data.substring(n2, n3).indexOf("64") > 1;
+            is64 = Std.parseFloat(nekoVersion) > 2.1 && data.substring(n2, n3).indexOf("64") > -1;
         }
         http.onError = function(error) {
             log("url: " + http.url);
