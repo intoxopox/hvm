@@ -52,6 +52,11 @@ class HVM {
         var version = Path.normalize(new Process("where", ["haxe"]).stdout.readAll().toString().trim());
         return version;
     }
+
+    public static var haxelibTempLocation(get, null):String;
+    private static function get_haxelibTempLocation():String {
+        return Path.normalize(compilersDir + "/haxelib.temp");
+    }
     
     public static function listLocal():Array<String> {
         var list = [];
@@ -257,6 +262,7 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
         pathParts.pop();
         var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
 
@@ -267,6 +273,24 @@ class HVM {
             } catch (e:Dynamic) {
                 log("");
                 log("ERROR: could not rename haxe, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using an IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return false;
+            }
+        }
+
+        if (FileSystem.exists(haxelibLocation)) {
+            try {
+                // Remove any old haxelib.exe.temp, if it exists
+                if (FileSystem.exists(haxelibTempLocation)) {
+                    FileSystem.deleteFile(haxelibTempLocation);
+                }
+                FileSystem.rename(haxelibLocation, haxelibLocation + ".temp");
+                FileSystem.rename(haxelibLocation + ".temp", haxelibLocation);
+            } catch (e:Dynamic) {
+                log("");
+                log("ERROR: could not rename haxelib, it's likely it was locked by another process.");
                 log("");
                 log("       If you are using an IDE it's possible it has locked this folder");
                 log("       Closing the IDE and re-running the command may fix the issue");
@@ -317,12 +341,18 @@ class HVM {
         var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
         pathParts.pop();
         var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
+
+        // Remove any old haxelib.exe.temp, if it exists
+        if (FileSystem.exists(haxelibTempLocation)) {
+            FileSystem.deleteFile(haxelibTempLocation);
+        }
         
         var backupExists:Bool = FileSystem.exists(location + ".backup") || FileSystem.exists(haxelibLocation + ".backup") || FileSystem.exists(haxeStdLocation + ".backup") || FileSystem.exists(nekoLocation + ".backup");
         if (backupExists == false) {
             log("No backup found!");
         } else {
             log("Deleting existing haxe");
+
             if (FileSystem.exists(haxeStdLocation) && FileSystem.exists(haxeStdLocation + ".backup")) {
                 try {
                     FileSystem.deleteDirectory(haxeStdLocation);
@@ -352,6 +382,10 @@ class HVM {
 
             if (FileSystem.exists(location) && FileSystem.exists(location + ".backup")) {
                 FileSystem.deleteFile(location);
+            }
+            if (FileSystem.exists(haxelibLocation) && FileSystem.exists(haxelibLocation + ".backup")) {
+                // Rename currently running haxelib.exe to haxelib.temp and move it to the hvm compilers dir
+                FileSystem.rename(haxelibLocation, haxelibTempLocation);
             }
             
             log("Restoring haxe");
@@ -387,6 +421,7 @@ class HVM {
                 FileSystem.deleteFile(location + ".backup");
             }
             if (FileSystem.exists(haxelibLocation + ".backup")) {
+                File.copy(haxelibLocation + ".backup", haxelibLocation);
                 FileSystem.deleteFile(haxelibLocation + ".backup");
             }
         }
@@ -437,6 +472,13 @@ class HVM {
             try {
                 if (FileSystem.exists(haxelibLocation)) {
                     File.copy(haxelibLocation, haxelibLocation + ".backup");
+                    if (FileSystem.exists(haxelibTempLocation)) {
+                        // haxelib.temp is the running process, so haxelib.exe is safe to delete
+                        FileSystem.deleteFile(haxelibLocation);
+                    } else {
+                        // haxelib.exe is the running process, so rename it to haxelib.temp and move it to the hvm compilers dir
+                        FileSystem.rename(haxelibLocation, haxelibTempLocation);
+                    }
                 }
             } catch (e) {
                 log("");
@@ -482,10 +524,16 @@ class HVM {
         if (FileSystem.exists(location)) {
             FileSystem.deleteFile(location);
         }
+        if (FileSystem.exists(haxelibLocation)) {
+            FileSystem.deleteFile(haxelibLocation);
+        }
         
         var safeHaxeVersion = StringTools.replace(version, ".", ",");
         var newHaxeLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/haxe.exe");
         createSymLink(location, newHaxeLocation);
+
+        var newHaxelibLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/haxelib.exe");
+        createSymLink(haxelibLocation, newHaxelibLocation);
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
@@ -538,6 +586,13 @@ class HVM {
             try {
                 if (FileSystem.exists(haxelibLocation)) {
                     File.copy(haxelibLocation, haxelibLocation + ".backup");
+                    if (FileSystem.exists(haxelibTempLocation)) {
+                        // haxelib.temp is the running process, so haxelib.exe is safe to delete
+                        FileSystem.deleteFile(haxelibLocation);
+                    } else {
+                        // haxelib.exe is the running process, so rename it to haxelib.temp and move it to the hvm compilers dir
+                        FileSystem.rename(haxelibLocation, haxelibTempLocation);
+                    }
                 }
             } catch (e) {
                 log("");
@@ -583,10 +638,16 @@ class HVM {
         if (FileSystem.exists(location)) {
             FileSystem.deleteFile(location);
         }
+        if (FileSystem.exists(haxelibLocation)) {
+            FileSystem.deleteFile(haxelibLocation);
+        }
         
         var safeHaxeVersion = StringTools.replace(version, ".", ",");
         var newHaxeLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/haxe.exe");
         createSymLink(location, newHaxeLocation);
+
+        var newHaxelibLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/haxelib.exe");
+        createSymLink(haxelibLocation, newHaxelibLocation);
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
