@@ -39,6 +39,12 @@ class HVM {
         var version = new sys.io.Process("haxe", ["-version"]).stdout.readAll().toString().trim();
         return version;
     }
+
+    public static var currentNekoVersion(get, null):String;
+    private static function get_currentNekoVersion():String {
+        var version = new sys.io.Process("neko", ["-version"]).stdout.readAll().toString().trim();
+        return version;
+    }
     
     public static var haxeLocation(get, null):String;
     private static function get_haxeLocation():String {
@@ -199,6 +205,8 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        pathParts.pop();
+        var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
 
         if (FileSystem.exists(location)) {
             try {
@@ -228,6 +236,20 @@ class HVM {
             }
         }
 
+        if (FileSystem.exists(nekoLocation)) {
+            try {
+                FileSystem.rename(nekoLocation, nekoLocation + ".temp");
+                FileSystem.rename(nekoLocation + ".temp", nekoLocation);
+            } catch (e:Dynamic) {
+                log("");
+                log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using an IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -240,8 +262,11 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
+        pathParts.pop();
+        var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
         
-        var backupExists:Bool = FileSystem.exists(location + ".backup");
+        var backupExists:Bool = FileSystem.exists(location + ".backup") || FileSystem.exists(haxelibLocation + ".backup") || FileSystem.exists(haxeStdLocation + ".backup") || FileSystem.exists(nekoLocation + ".backup");
         if (backupExists == false) {
             log("No backup found!");
         } else {
@@ -259,29 +284,62 @@ class HVM {
                 }
             }
 
-            if (FileSystem.exists(location)) {
+            if (FileSystem.exists(nekoLocation) && FileSystem.exists(nekoLocation + ".backup")) {
+                log("Deleting existing neko");
+                try {
+                    FileSystem.deleteDirectory(nekoLocation);
+                } catch (e) {
+                    log("");
+                    log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
+                    log("");
+                    log("       If you are using an IDE it's possible it has locked this folder");
+                    log("       Closing the IDE and re-running the command may fix the issue");
+                    return;
+                }
+            }
+
+            if (FileSystem.exists(location) && FileSystem.exists(location + ".backup")) {
                 FileSystem.deleteFile(location);
             }
             
             log("Restoring haxe");
-            try {
-                FileSystem.rename(haxeStdLocation + ".backup", haxeStdLocation);
-            } catch (e) {
-                log("");
-                log("ERROR: could not rename haxe std folder, it's likely it was locked by another process.");
-                log("");
-                log("       If you are using an IDE it's possible it has locked this folder");
-                log("       Closing the IDE and re-running the command may fix the issue");
-                return;
+            if (FileSystem.exists(haxeStdLocation + ".backup")) {
+                try {
+                    FileSystem.rename(haxeStdLocation + ".backup", haxeStdLocation);
+                } catch (e) {
+                    log("");
+                    log("ERROR: could not rename haxe std folder, it's likely it was locked by another process.");
+                    log("");
+                    log("       If you are using an IDE it's possible it has locked this folder");
+                    log("       Closing the IDE and re-running the command may fix the issue");
+                    return;
+                }
+            }
+
+            if (FileSystem.exists(nekoLocation + ".backup")) {
+                log("Restoring neko");
+                try {
+                    FileSystem.rename(nekoLocation + ".backup", nekoLocation);
+                } catch (e) {
+                    log("");
+                    log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
+                    log("");
+                    log("       If you are using an IDE it's possible it has locked this folder");
+                    log("       Closing the IDE and re-running the command may fix the issue");
+                    return;
+                }
             }
             
             if (FileSystem.exists(location + ".backup")) {
                 File.copy(location + ".backup", location);
                 FileSystem.deleteFile(location + ".backup");
             }
+            if (FileSystem.exists(haxelibLocation + ".backup")) {
+                FileSystem.deleteFile(haxelibLocation + ".backup");
+            }
         }
         
-        log("Current haxe version: " + currentHaxeVersion);
+        log("Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function installOfficial(version:String) {
@@ -290,6 +348,8 @@ class HVM {
         }
 
         downloadOfficial(version);
+
+        var newNekoLocation:String = downloadNeko(version);
 		
 		restoreBackup();
         
@@ -297,6 +357,9 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
+        pathParts.pop();
+        var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
             
         var backupExists:Bool = FileSystem.exists(location + ".backup");
         if (backupExists == false) {
@@ -315,6 +378,23 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(haxelibLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing haxelib");
+            try {
+                if (FileSystem.exists(haxelibLocation)) {
+                    File.copy(haxelibLocation, haxelibLocation + ".backup");
+                }
+            } catch (e) {
+                log("");
+                log("ERROR: could not backup haxelib, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
 		
         backupExists = FileSystem.exists(haxeStdLocation + ".backup");
         if (backupExists == false) {
@@ -324,6 +404,21 @@ class HVM {
             } catch (e) {
                 log("");
                 log("ERROR: could not rename haxe std folder, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
+
+        backupExists = FileSystem.exists(nekoLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing neko folder");
+            try {
+                FileSystem.rename(nekoLocation, nekoLocation + ".backup");
+            } catch (e) {
+                log("");
+                log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
                 log("");
                 log("       If you are using and IDE it's possible it has locked this folder");
                 log("       Closing the IDE and re-running the command may fix the issue");
@@ -342,8 +437,10 @@ class HVM {
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
+
+        createSymLink(nekoLocation, newNekoLocation);
         
-        log("Current haxe version: " + currentHaxeVersion);
+        log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function installNightly(version:String) {
@@ -352,6 +449,8 @@ class HVM {
         }
 
         downloadNightly(version);
+
+        var newNekoLocation:String = downloadNeko(version);
 		
 		restoreBackup();
         
@@ -359,6 +458,9 @@ class HVM {
         var pathParts = location.split("/");
         pathParts.pop();
         var haxeStdLocation = Path.normalize(pathParts.join("/") + "/std");
+        var haxelibLocation = Path.normalize(pathParts.join("/") + "/haxelib.exe");
+        pathParts.pop();
+        var nekoLocation = Path.normalize(pathParts.join("/") + "/neko");
 
         var backupExists:Bool = FileSystem.exists(location + ".backup");
         if (backupExists == false) {
@@ -377,6 +479,23 @@ class HVM {
                 return;
             }
         }
+
+        backupExists = FileSystem.exists(haxelibLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing haxelib");
+            try {
+                if (FileSystem.exists(haxelibLocation)) {
+                    File.copy(haxelibLocation, haxelibLocation + ".backup");
+                }
+            } catch (e) {
+                log("");
+                log("ERROR: could not backup haxelib, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
 		
         backupExists = FileSystem.exists(haxeStdLocation + ".backup");
         if (backupExists == false) {
@@ -386,6 +505,21 @@ class HVM {
             } catch (e) {
                 log("");
                 log("ERROR: could not rename haxe std folder, it's likely it was locked by another process.");
+                log("");
+                log("       If you are using and IDE it's possible it has locked this folder");
+                log("       Closing the IDE and re-running the command may fix the issue");
+                return;
+            }
+        }
+
+        backupExists = FileSystem.exists(nekoLocation + ".backup");
+        if (backupExists == false) {
+            log("Backing up existing neko folder");
+            try {
+                FileSystem.rename(nekoLocation, nekoLocation + ".backup");
+            } catch (e) {
+                log("");
+                log("ERROR: could not rename neko folder, it's likely it was locked by another process.");
                 log("");
                 log("       If you are using and IDE it's possible it has locked this folder");
                 log("       Closing the IDE and re-running the command may fix the issue");
@@ -404,8 +538,10 @@ class HVM {
         
         var newStdLocation = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/std");
         createSymLink(haxeStdLocation, newStdLocation);
+
+        createSymLink(nekoLocation, newNekoLocation);
         
-        log("Current haxe version: " + currentHaxeVersion);
+        log("Success! Current haxe version: " + currentHaxeVersion + " | Current neko version: " + currentNekoVersion);
     }
     
     public static function downloadOfficial(version:String) {
@@ -494,6 +630,80 @@ class HVM {
                 log("Expanded archive already exists, skipping unzip");
             }
         }
+    }
+
+    public static function downloadNeko(haxeVersion:String):String {
+        var nekoVersion:String = null;
+        var is64:Bool = false;
+        var srcUrl:String = "https://github.com/HaxeFoundation/neko/releases/download/v";
+        
+        var http = new Http('https://raw.githubusercontent.com/HaxeFoundation/haxe/${haxeVersion.split("_").pop()}/Makefile');
+        http.setHeader("User-Agent", "HVM");
+        http.onStatus = function(status:Int) {
+        }
+        http.onData = function(data:String) {
+            var n1 = data.indexOf("$(INSTALLER_TMP_DIR)/neko-");
+            var n2 = data.indexOf("http", n1);
+            var n3 = data.indexOf(" -O", n2);
+            var n4 = data.indexOf("/neko-", n2);
+            var n5 = data.indexOf("-", n4 + 6);
+            nekoVersion = data.substring(n4 + 6, n5);
+            srcUrl += StringTools.replace(nekoVersion, ".", "-") + "/";
+            is64 = Std.parseFloat(nekoVersion) > 2.1 && data.substring(n2, n3).indexOf("64") > -1;
+        }
+        http.onError = function(error) {
+            log("url: " + http.url);
+            throw "    Problem listing official releases: " + error;
+        }
+        http.request();
+
+        var srcFile = "neko-" + nekoVersion + "-";
+        var ext:String = null;
+        switch (system) {
+            case Linux:
+                ext = "linux64.tar.gz";
+            case Windows:
+                if (is64) {
+                    ext = "win64.zip";
+                } else {
+                    ext = "win.zip";
+                }
+            case Mac:
+                ext = "osx.tar.gz";
+                if (is64) {
+                    ext = "osx64.tar.gz";
+                } else {
+                    ext = "osx.tar.gz";
+                }
+            case Unknown:    
+                throw "Unknown system!";
+        }
+        srcFile += ext;
+        srcUrl += srcFile;
+
+        log("Downloading official Neko " + nekoVersion);
+        
+        var safeHaxeVersion = StringTools.replace(haxeVersion, ".", ",");
+        var dstFile = Path.normalize(compilersDir + "/" + safeHaxeVersion + "/" + srcFile);
+        if (FileSystem.exists(dstFile) == false) {
+            downloadFile(srcUrl, dstFile);
+        } else {
+            log("Destination archive already exists, skipping download");
+        }
+
+        var safeNekoVersion = StringTools.replace(nekoVersion, ".", ",");
+        var expandedDir = Path.normalize(compilersDir + "/neko-" + safeNekoVersion);
+        if (FileSystem.exists(expandedDir) == false) {
+            unzipFile(dstFile, expandedDir, true);
+        } else {
+            if (FileSystem.readDirectory(expandedDir).length == 0) {
+                unzipFile(dstFile, expandedDir, true);
+            } else {
+                log("Expanded archive already exists, skipping unzip");
+            }
+        }
+
+        return expandedDir;
     }
     
     public static function downloadFile(srcUrl:String, dstFile:String, isRedirect:Bool = false) {
