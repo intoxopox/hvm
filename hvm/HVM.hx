@@ -6,6 +6,7 @@ import haxe.io.Bytes;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
+import sys.io.Process;
 
 using StringTools;
 
@@ -36,19 +37,19 @@ class HVM {
     
     public static var currentHaxeVersion(get, null):String;
     private static function get_currentHaxeVersion():String {
-        var version = new sys.io.Process("haxe", ["-version"]).stdout.readAll().toString().trim();
+        var version = new Process("haxe", ["-version"]).stdout.readAll().toString().trim();
         return version;
     }
 
     public static var currentNekoVersion(get, null):String;
     private static function get_currentNekoVersion():String {
-        var version = new sys.io.Process("neko", ["-version"]).stdout.readAll().toString().trim();
+        var version = new Process("neko", ["-version"]).stdout.readAll().toString().trim();
         return version;
     }
     
     public static var haxeLocation(get, null):String;
     private static function get_haxeLocation():String {
-        var version = Path.normalize(new sys.io.Process("where", ["haxe"]).stdout.readAll().toString().trim());
+        var version = Path.normalize(new Process("where", ["haxe"]).stdout.readAll().toString().trim());
         return version;
     }
     
@@ -859,10 +860,10 @@ class HVM {
         Sys.setCwd(srcPath);
         
         if (dir == false) {
-            var output = new sys.io.Process("mklink " + srcFile + " \"" + target + "\"").stdout.readAll().toString().trim();
+            var output = new Process("mklink " + srcFile + " \"" + target + "\"").stdout.readAll().toString().trim();
             log(output);
         } else {
-            var output = new sys.io.Process("mklink /d " + srcFile + " \"" + target + "\"").stdout.readAll().toString().trim();
+            var output = new Process("mklink /d " + srcFile + " \"" + target + "\"").stdout.readAll().toString().trim();
             log(output);
         }
         
